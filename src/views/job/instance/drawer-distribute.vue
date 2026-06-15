@@ -41,6 +41,24 @@
             <el-table-column type="expand" label="" width="32">
               <template #default="{ row }">
                 <div style="padding: 8px 0">
+                  <div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px; color: #666;">{{ t('message.job.task.status') }}:</span>
+                    <el-select
+                      v-model="childStates[row.taskId].status"
+                      size="small"
+                      style="width: 130px"
+                      placeholder="All"
+                      clearable
+                      @change="(val: number | null) => onChildStatusChange(row, val)"
+                    >
+                      <el-option :label="t('message.commonMsg.all')" :value="null"/>
+                      <el-option :label="t('message.taskStatus.init')" :value="5"/>
+                      <el-option :label="t('message.taskStatus.running')" :value="15"/>
+                      <el-option :label="t('message.taskStatus.success')" :value="25"/>
+                      <el-option :label="t('message.taskStatus.failed')" :value="20"/>
+                      <el-option :label="t('message.taskStatus.stop')" :value="30"/>
+                    </el-select>
+                  </div>
                   <el-table
                     :data="childStates[row.taskId]?.children || []"
                     v-loading="childStates[row.taskId]?.loading"
@@ -152,6 +170,7 @@ interface ChildState {
   size: number;
   total: number;
   loading: boolean;
+  status: number | null;
 }
 const childStates = reactive<Record<string, ChildState>>({});
 
@@ -296,19 +315,23 @@ const getTaskData = async () => {
  */
 const fetchChildData = async (row: any) => {
   const taskId = row.taskId;
-  const state = childStates[taskId] || { children: [], page: 1, size: 20, total: 0, loading: false };
+  const state = childStates[taskId] || { children: [], page: 1, size: 20, total: 0, loading: false, status: null };
   state.loading = true;
   childStates[taskId] = state;
 
   try {
-    let data = await instanceTaskApi.getListChildList({
+    const params: any = {
       taskId: row.taskId,
       jobInstanceId: row.jobInstanceId,
       circleId: row.circleId,
       pull: row.pull,
       page: state.page,
       size: state.size,
-    });
+    };
+    if (state.status !== null && state.status !== undefined) {
+      params.status = state.status;
+    }
+    let data = await instanceTaskApi.getListChildList(params);
 
     state.total = data['total'] || 0;
     state.children = [];
@@ -357,13 +380,25 @@ const onChildPageChange = async (row: any, page: number) => {
 };
 
 /**
+ * Handle child task status filter change
+ */
+const onChildStatusChange = async (row: any, status: number | null) => {
+  const taskId = row.taskId;
+  if (childStates[taskId]) {
+    childStates[taskId].status = status;
+    childStates[taskId].page = 1;
+    await fetchChildData(row);
+  }
+};
+
+/**
  * Handle row expand change
  */
 const onExpandChange = async (row: any, expanded: boolean) => {
   if (expanded && row.hasChildren) {
     const taskId = row.taskId;
     if (!childStates[taskId]) {
-      childStates[taskId] = { children: [], page: 1, size: 20, total: 0, loading: false };
+      childStates[taskId] = { children: [], page: 1, size: 20, total: 0, loading: false, status: null };
     } else {
       childStates[taskId].page = 1;
     }
