@@ -68,27 +68,42 @@
                 />
               </el-form-item>
             </el-col>
-            <el-col :xs="8" :sm="12" :md="8" :lg="6" :xl="4" class="mb20">
-              <el-button size="default" type="primary" class="ml10"
-                         @click="onSearch(tableSearchRef)">
-                <el-icon>
-                  <ele-Search/>
-                </el-icon>
-                {{ $t('message.commonBtn.query') }}
-              </el-button>
-              <el-button size="default" type="primary" class="ml10"
-                         @click="onReset()">
-                <el-icon>
-                  <ele-RefreshRight/>
-                </el-icon>
-                {{ $t('message.commonBtn.reset') }}
-              </el-button>
+            <el-col :xs="24" :sm="24" :md="12" :lg="24" :xl="24" class="mb20">
+              <div style="display: flex; align-items: center;">
+                <div>
+                  <el-button size="default" type="primary"
+                             @click="onSearch(tableSearchRef)">
+                    <el-icon>
+                      <ele-Search/>
+                    </el-icon>
+                    {{ $t('message.commonBtn.query') }}
+                  </el-button>
+                  <el-button size="default" type="primary" class="ml10"
+                             @click="onReset()">
+                    <el-icon>
+                      <ele-RefreshRight/>
+                    </el-icon>
+                    {{ $t('message.commonBtn.reset') }}
+                  </el-button>
+                </div>
+                <div style="margin-left: auto;">
+                  <el-button size="default" type="danger" :disabled="selectedIds.length === 0"
+                             @click="onBatchDelete">
+                    <el-icon><ele-Delete /></el-icon>
+                    批量删除
+                  </el-button>
+                  <span v-if="selectedIds.length > 0" style="margin-left: 4px; font-size: 12px; color: #999;">
+                    已选 {{ selectedIds.length }} 项
+                  </span>
+                </div>
+              </div>
             </el-col>
           </el-row>
         </el-form>
       </div>
       <el-table :data="state.tableData.data" v-loading="state.tableData.loading"
-                style="width: 100%">
+                style="width: 100%" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="45"/>
         <el-table-column prop="appName" :label="t('message.app.name')"
                          show-overflow-tooltip></el-table-column>
         <el-table-column prop="id" :label="t('message.job.instance.id')"
@@ -391,7 +406,7 @@ const onDel = (row: RowJobInstanceType) => {
   })
     .then(async () => {
       await instanceApi.delete({
-        "id": row.id,
+        "ids": [row.id],
       });
 
       await getTableData();
@@ -400,6 +415,27 @@ const onDel = (row: RowJobInstanceType) => {
     .catch(() => {
     });
 };
+
+// batch selection
+const selectedIds = ref<number[]>([]);
+const onSelectionChange = (rows: any[]) => {
+  selectedIds.value = rows.map((r: any) => r.id);
+};
+const onBatchDelete = () => {
+  ElMessageBox.confirm(
+    t('message.job.instance.deleteTitle') + ` (${selectedIds.value.length})?`,
+    t('message.commonMsg.tip'),
+    { confirmButtonText: t('message.commonBtn.confirm'), cancelButtonText: t('message.commonBtn.cancel'), type: 'warning' }
+  )
+    .then(async () => {
+      await instanceApi.delete({ ids: selectedIds.value });
+      selectedIds.value = [];
+      await getTableData();
+      ElMessage.success(t('message.commonMsg.deleteSuccess'));
+    })
+    .catch(() => {});
+};
+
 // 分页改变
 const onHandleSizeChange = (val: number) => {
   state.tableData.param.pageSize = val;
